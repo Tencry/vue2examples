@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.1/dist/css/bootstrap.min.css"
+        integrity="sha384-zCbKRCUGaJDkqS1kPbPd7TveP5iyJE0EjAuZQTgFLD2ylzuqKfdKlfG/eSrtxUkn" crossorigin="anonymous">
+</head>
+
+<body>
+    <div id="app" class="container" style="max-width: 400px;">
+        <p class="lead">{{ message }}</p>
+
+        <component v-bind:is="currentScreen" v-on:change-screen="onChangeScreen"></component>
+
+        <template v-if="false">
+            <login-screen></login-screen>
+            <reg-screen></reg-screen>
+            <help-screen></help-screen>
+        </template>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.slim.min.js"
+        integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.1/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-fQybjgWLrvvRgtW6bFlB7jaZrFsaBXjsOMm/tB9LTS58ONXgqbR9W8oWht/amnpF"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js"></script>
+    <script>
+
+        /**
+         * Fake Service api
+         */
+        const api = Object.create(null);
+        const userStorage = {
+            'test@test.com': 'test'
+        };
+        api.login = function (email, password) {
+            if (userStorage.hasOwnProperty(email)) {
+                return userStorage[email] == password;
+            }
+            return false;
+        };
+        api.registration = function (email, password) {
+            if (!userStorage.hasOwnProperty(email)) {
+                userStorage[email] = password;
+            }
+            else {
+                return false;
+            }
+            return true;
+        }
+
+        /**
+         * Validator
+         */
+        function Validator(value) {
+            this.value = value;
+            this.errors = [];
+        }
+        Validator.prototype.isMandatory = function () {
+            return this.value != null && this.value != '';
+        }
+        Validator.prototype.isNumber = function () {
+            return typeof this.value == 'number';
+        }
+        Validator.prototype.isString = function () {
+            return typeof this.value == 'string';
+        }
+        Validator.prototype.isEmail = function () {
+            return this.isString()
+                && this.value.toLowerCase()
+                    .match(
+                        /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
+                    ) != null;
+        }
+        Validator.prototype.validate = function (props, args) {
+            let types = props.split('|');
+            this.errors = [];
+            for (let index = 0; index < types.length; index++) {
+                const element = types[index];
+                switch (element) {
+                    case 'mandatory':
+                        this.isMandatory() ? '' : this.errors.push(element);
+                        break;
+                    case 'number':
+                        this.isNumber() ? '' : this.errors.push(element);
+                        break;
+                    case 'string':
+                        this.isString() ? '' : this.errors.push(element);
+                        break;
+                    case 'email':
+                        this.isEmail() ? '' : this.errors.push(element);
+                        break;
+                    case 'match':
+                        this.value == args['match'] ? '' : this.errors.push(element);
+                        break;
+                }
+            }
+
+            return this.errors.length == 0;
+        }
+        Validator.prototype.hasErrors = function () {
+            return this.errors.length > 0;
+        }
+        Validator.prototype.getErrors = function () {
+            return this.errors;
+        }
+
+
+        /**
+         * Tests
+         */
+        console.assert(api.registration('user', 'user'), 'New User registration');
+        console.assert(api.registration('test@test.com', 'test') == false, 'Existing user registration');
+        console.assert(api.login('user', 'user'), 'Valid user authorization');
+        console.assert(api.login('user', 'user2') == false, 'Invalid password');
+        console.assert(api.login('user2', 'user2') == false, 'Invalid user auth');
+
+        console.log('test@test.com'.toLowerCase().match(
+            /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
+        ));
+        console.log('P@ssw0rd'.toLowerCase().match(
+            /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
+        ));
+        console.assert('test@test.com'.toLowerCase()
+            .match(
+                /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
+            ).length > 0,
+            'String is a valid email'
+        );
+        console.assert('Passw0rd'.toLowerCase()
+            .match(
+                /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
+            ) == null,
+            'String is not a valid email'
+        );
+
+        let email = new Validator('test@test.com');
+        console.assert(email.isNumber() == false, 'Email is not a number');
+        console.assert(email.isString(), 'Email is a string');
+        console.assert(email.isEmail(), 'Email is valid');
+        console.assert(email.validate('email'), 'Email validation', { 'hasErrors': email.hasErrors(), 'errors': email.getErrors() });
+        console.assert(email.validate('number') == false, 'Email validation', { 'hasErrors': email.hasErrors(), 'errors': email.getErrors() });
+
+        let passwd = new Validator('passw0rd');
+        console.assert(passwd.isNumber() == false, 'Password is not a number');
+        console.assert(passwd.isString(), 'Password is a string');
+        console.assert(passwd.isEmail() == false, 'Password is not email');
+
+        let pi = new Validator(3.1415);
+        console.assert(pi.isNumber(), 'PI is the number');
+        console.assert(pi.isString() == false, 'PI is not a string');
+        console.assert(pi.isEmail() == false, 'PI is not email');
+        console.assert(pi.validate('number|email|string') == false, 'PI validation', { 'hasErrors': pi.hasErrors(), 'errors': pi.getErrors() });
+
+        let empty = new Validator('');
+        console.assert(empty.validate('mandatory') == false, 'Empty string', { 'hasErrors': empty.hasErrors(), 'errors': empty.getErrors() });
+
+
+        /**
+         * Vue application
+         */
+        Vue.component('login-screen', {
+            template: `
+            <form>
+                <p class="lead">{{ title }}</p>
+                <div class="alert alert-warning" role="alert" v-show="warning">The email or password you entered is invalid</div>
+                <div class="alert alert-success" role="alert" v-show="success">You are logged in!</div>
+                <div class="form-group">
+                    <label for="exampleInputEmail1">Email address</label>
+                    <input type="email" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" v-model="model.email">
+                    <small id="emailHelp" v-show="!hints" class="form-text text-muted">We'll never share your email with anyone else.</small>
+                    <small id="emailHint" v-show="hints && errors.email" class="form-text text-danger" v-for="i in errors.email">{{i}} incorrect</small>
+                </div>
+                <div class="form-group">
+                    <label for="exampleInputPassword1">Password</label>
+                    <input type="password" class="form-control" id="exampleInputPassword1" v-model="model.password">
+                    <small id="passwordHint" v-show="hints && errors.passwd" class="form-text text-danger">Enter the password</small>
+                </div>
+                <button type="submit" class="btn btn-primary"   @click.prevent="onLogin">Login</button>
+                <button type="button" class="btn btn-secondary" @click.prevent="$emit('change-screen', 'reg-screen')">or Register</button>
+            </form>
+            `,
+            data: () => ({
+                title: 'Login',
+                warning: false,
+                success: false,
+                hints: false,
+                model: {
+                    email: null,
+                    password: null
+                },
+                errors: {
+                    email: [],
+                    passwd: null
+                }
+            }),
+            methods: {
+                _onLogin() {
+                    this.warning = this.success = this.hints = false;
+                    this.errors.email = this.errors.passwd = null;
+
+                    // validation
+                    let email = new Validator(this.model.email);
+                    let passwd = new Validator(this.model.password);
+
+                    let isEmailValid = email.validate('mandatory|email');
+                    let isPasswdValid = passwd.validate('string|mandatory');
+
+                    if ( isEmailValid && isPasswdValid ) {
+
+                        // dispatch
+                        if (api.login(this.model.email, this.model.password)) {
+                            this.success = true;
+                            this.$emit('change-screen', 'users-screen');
+                        }
+                        else {
+                            this.warning = true;
+                        }
+                    }
+                    else {
+                        this.hints = true;
+                        this.errors.email = email.hasErrors() && email.getErrors();
+                        this.errors.passwd = passwd.hasErrors() && passwd.getErrors();
+                    }
+                },
+                onLogin() {
+                    this.check(
+                        // if valid
+                        () => {
+                            // dispatch
+                            if (api.login(this.model.email, this.model.password)) {
+                                this.success = true;
+                                this.$emit('change-screen', 'users-screen');
+                            }
+                            else {
+                                this.warning = true;
+                            }
+                        },
+                        // if invalid
+                        (email, passwd) => {
+                            this.hints         = true;
+                            this.errors.email  = email.hasErrors()  && email.getErrors();
+                            this.errors.passwd = passwd.hasErrors() && passwd.getErrors();
+                        }
+                    );
+                },
+                check(onValid, onInvalid) {
+                    this.resetData();
+
+                    // validation
+                    let email = new Validator(this.model.email);
+                    let passwd = new Validator(this.model.password);
+
+                    let isEmailValid = email.validate('mandatory|email');
+                    let isPasswdValid = passwd.validate('string|mandatory');
+
+                    if ( isEmailValid && isPasswdValid ) {
+                        onValid();
+                    }
+                    else {
+                        onInvalid(email, passwd);
+                    }
+
+                },
+                resetData() {
+                    this.warning = this.success = this.hints = false;
+                    this.errors.email = this.errors.passwd = null;
+                }
+            }
+        });
+
+        Vue.component('reg-screen', {
+            template: `
+            <form>
+                <p class="lead">{{ title }}</p>
+                <div class="alert alert-warning" role="alert" v-show="warning">Your email is already registered.</div>
+                <div class="alert alert-success" role="alert" v-show="success">Congratulations! You are registered.</div>
+                <div class="form-group">
+                    <label for="exampleInputEmail1">Email address</label>
+                    <input type="email" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" v-model="model.email">
+                    <small id="emailHelp" v-show="! errors.email" class="form-text text-muted">We'll never share your email with anyone else.</small>
+                    <small id="emailHelp" v-for="i in errors.email" class="form-text text-danger">{{ i }}</small>
+                </div>
+                <div class="form-group">
+                    <label for="exampleInputPassword1">Password</label>
+                    <input type="password" class="form-control" id="exampleInputPassword1" v-model="model.password">
+                    <small id="passwordHelp" class="form-text text-danger" v-for="i in errors.password">{{i}}</small>
+                </div>
+                <div class="form-group">
+                    <label for="exampleInputRepeatPassword1">Repeat Password</label>
+                    <input type="password" class="form-control" id="exampleInputRepeatPassword1" v-model="model.repeatPassword">
+                    <small id="repeatPasswordHelp" class="form-text text-danger" v-for="i in errors.repeatPassword">{{i}}</small>
+                </div>
+                <p>By signing up you agree to our <a href="#" @click.prevent="$emit('change-screen', 'help-screen')">terms</a> and privacy policy</p>
+                <button type="submit" class="btn btn-primary"   @click.prevent="onRegistration">Registration</button>
+                <button type="button" class="btn btn-secondary" @click.prevent="$emit('change-screen', 'login-screen')">Already have an account?</button>
+            </form>
+            `,
+            data: () => ({
+                title: 'Registration',
+                warning: false,
+                success: false,
+                model: {
+                    email: null,
+                    password: null,
+                    repeatPassword: null
+                },
+                errors: {
+                    email: null,
+                    password: null,
+                    repeatPassword: null
+                }
+            }),
+            methods: {
+                onRegistration() {
+                    this.check(
+                        // if valid
+                        () => {
+                            if (api.registration(this.model.email, this.model.password)) {
+                                this.success = true;
+                            }
+                            else {
+                                this.warning = true;
+                            }
+                        },
+                        // else
+                        (email, passwd, repeat) => {
+                            this.errors.email          = email.hasErrors()  && email.getErrors();
+                            this.errors.password       = passwd.hasErrors() && passwd.getErrors();
+                            this.errors.repeatPassword = repeat.hasErrors() && repeat.getErrors();
+                        }
+                    );
+                },
+                check(onValid, onInvalid) {
+                    this.resetData();
+
+                    let email = new Validator(this.model.email);
+                    let passwd = new Validator(this.model.password);
+                    let repeat = new Validator(this.model.repeatPassword);
+
+                    let isEmailValid = email.validate('email|mandatory');
+                    let isPasswdValid = passwd.validate('string|mandatory');
+                    let isRepeatValid = repeat.validate('string|mandatory|match', { 'match': this.model.password });
+
+                    if (
+                        isEmailValid
+                        && isPasswdValid
+                        && isRepeatValid
+                    ) {
+                        onValid();
+                    }
+                    else {
+                        onInvalid(email, passwd, repeat);
+                    }
+                },
+                resetData() {
+                    this.success = this.warning = false;
+                    this.errors = { email: null, password: null, repeatPassword: null };
+                }
+            }
+        })
+
+        Vue.component('help-screen', {
+            template: `
+            <div>
+                <p class="lead">{{ title }}</p>
+                <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer lacus lorem, laoreet vel leo ac, bibendum fermentum felis. Aenean a libero vel sapien aliquam ultrices nec sit amet mauris. Pellentesque tincidunt ligula dolor, id cursus tortor dapibus a. Maecenas id egestas tellus. Maecenas ac porta ante. Ut vel risus ut metus finibus hendrerit. Aenean erat sapien, vestibulum lacinia augue at, porta pellentesque quam. Donec pharetra blandit tellus, sit amet interdum justo tempus et. Etiam vestibulum commodo felis, vitae accumsan libero lobortis sed. Mauris blandit lobortis ultricies. Morbi rutrum tellus viverra lorem hendrerit, tempor eleifend metus malesuada. Integer fermentum erat sed venenatis maximus. Mauris placerat aliquet est. Vestibulum ullamcorper fringilla massa, eu commodo dui venenatis id. Vivamus pretium ligula eu condimentum aliquam.</p>
+                <p>Ut ullamcorper cursus sapien, ac convallis mauris. Praesent congue ut justo eget euismod. Etiam diam arcu, gravida id urna eget, vehicula aliquam magna. Nulla id lacinia quam, in iaculis felis. Fusce eu laoreet metus. Pellentesque vehicula nisl id tempus posuere. Duis tristique sapien vel mauris accumsan finibus quis ultrices neque. Pellentesque ac rhoncus nibh. In eu mi eget purus mattis laoreet ac a turpis. Aliquam aliquam mattis tortor, suscipit molestie elit eleifend vitae. Etiam id maximus augue. Nunc fermentum sodales ipsum a lacinia. Morbi fringilla facilisis purus quis semper. Sed efficitur nisi sit amet sapien dapibus scelerisque. Sed pulvinar, libero quis sodales hendrerit, dui quam ornare tellus, eget tincidunt nulla metus eu enim. Aliquam erat volutpat.</p>
+                <button class="btn btn-primary" @click.prevent="$emit('change-screen', 'reg-screen')">Back to registration</button>
+            </div>
+            `,
+            data: () => ({
+                title: 'Help'
+            })
+        });
+
+        Vue.component('users-screen', {
+            template: `
+                <div>
+                    <p class="lead">{{title}}</p>
+                    <table class="table">
+                        <thead>
+                        <tr>
+                            <th>email</th><th>passwd</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr v-for="(i, k) in users">
+                            <td>{{k}}</td><td>{{i}}</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            `,
+            data: () => ({
+                title: 'Users'
+            }),
+            computed: {
+                users: {
+                    get() {
+                        return userStorage;
+                    }
+                }
+            }
+        })
+
+        var app = new Vue({
+            el: '#app',
+            data: {
+                message: 'Hello Vue',
+                screen: 'login-screen',
+            },
+            methods: {
+                onChangeScreen(value) {
+                    this.currentScreen = value;
+                }
+            },
+            computed: {
+                currentScreen: {
+                    get() {
+                        return this.screen;
+                    },
+                    set(value) {
+                        if (0 < ['login-screen', 'reg-screen', 'help-screen', 'users-screen'].indexOf(value)) {
+                            this.screen = value;
+                        }
+                        else {
+                            this.screen = 'login-screen';
+                            console.warn('There may be an error here. Screen value is', value);
+                        }
+                    }
+                }
+            }
+        })
+    </script>
+</body>
+
+</html>
